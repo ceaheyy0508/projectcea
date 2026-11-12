@@ -1,0 +1,51 @@
+name: Build Tamaa Music APK
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tamaa-customize.patch'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout build recipe
+        uses: actions/checkout@v4
+      - name: Checkout pinned InterTune source
+        uses: actions/checkout@v4
+        with:
+          repository: ItzSkyeYT/InterTune
+          ref: ac7bdefbb7edadaf370141cb57f9dc2b5c66afb1
+          path: music
+          submodules: recursive
+      - name: Apply Tamaa Music changes
+        run: |
+          rm -f music/services.properties
+          cd music
+          git apply ../tamaa-customize.patch
+          chmod +x gradlew
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+          cache-dependency-path: music/gradle/wrapper/gradle-wrapper.properties
+      - name: Install Android SDK 36
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
+      - name: Build debug APK
+        working-directory: music
+        run: ./gradlew :app:assembleCoreDebug --stacktrace
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tamaa-Music-debug
+          path: music/app/build/outputs/apk/core/debug/*.apk
+          if-no-files-found: error
